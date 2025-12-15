@@ -1,0 +1,16 @@
+name: Lint
+
+on:
+  pull_request:
+    branches: [ "**" ]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run lint
+        run: ./lint.sh
