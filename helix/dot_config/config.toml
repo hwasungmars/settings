@@ -5,3 +5,8 @@ insert = "bar"
 normal = "block"
 select = "underline"
 
+[editor.auto-save]
+focus-lost = true
+
+[keys.normal.space.n]
+p = ":read ~/.config/helix/templates/template.py"
