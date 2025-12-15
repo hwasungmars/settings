@@ -1,0 +1,22 @@
+name: Lint
+
+on:
+  pull_request:
+    branches: [ "**" ]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install tools
+        run: pip install ruff ty
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run lint
+        run: ./lint.sh
+
+      - name: Assert no changes
+        run: git diff --exit-code
