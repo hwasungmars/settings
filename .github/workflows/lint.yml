@@ -17,3 +17,6 @@ jobs:
 
       - name: Run lint
         run: ./lint.sh
+
+      - name: Assert no changes
+        run: git diff --exit-code
