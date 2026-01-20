@@ -1,0 +1,48 @@
+[push]
+    default = current
+    autoSetupRemote = true
+
+[pull]
+    default = current
+
+[rebase]
+    autoStash = true
+
+[core]
+    editor       = hx
+    excludesfile = ~/.gitignore
+    pager        = less -F -X
+
+[alias]
+    br   = branch
+    can  = "commit --amend --no-edit"
+    ch   = checkout
+    main = !git checkout main && git pull && git pr
+    st   = status
+    tr   = "log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr)%Creset' --abbrev-commit --date=relative"
+
+[color]
+    branch = auto
+    diff   = auto
+    pager  = true
+    status = auto
+    ui     = true
+
+[color "diff"]
+    frag = magenta bold
+    old  = red bold
+    new  = green bold
+
+[color "status"]
+    changed   = yellow
+
+[user]
+    name  = Hwasung Lee
+    email = hwasung_lee@apple.com
+
+[credential]
+    helper = cache
+
+[pager]
+	branch = false
+	grep   = false
