@@ -63,10 +63,7 @@ LOGGER.info("Pruning remote branches that are merged.")
 subprocess.run(["git", "fetch", "--prune", "origin"], check=True)
 for branch in run_then_split("git branch -r --merged"):
     if (
-        branch.startswith("origin/")
-        and not branch.startswith("origin/HEAD")
-        and not branch.startswith("origin/main")
-        and not branch.startswith("origin/master")
+        branch.startswith("origin/hwasung/")
     ):
         branch_name = branch.removeprefix("origin/")
         try:

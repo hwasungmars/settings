@@ -1,15 +1,16 @@
 theme = "sonokai"
 
 [editor]
+auto-save = true
 bufferline = "always"
+rulers = [120]
+trim-trailing-whitespace = true
 
 [editor.cursor-shape]
 insert = "bar"
 normal = "block"
 select = "underline"
 
-[editor.auto-save]
-focus-lost = true
-
 [keys.normal.space.n]
-p = ":read ~/.config/helix/templates/template.py"
+p = ":read /home/hwasung_lee/.config/helix/templates/template.py"
+s = ":read /home/hwasung_lee/.config/helix/templates/template.sh"
