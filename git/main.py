@@ -12,9 +12,16 @@ SCRIPT_DIR = pathlib.Path(__file__).parent
 
 def main(args: argparse.Namespace) -> None:
     """Main function."""
-    force_symlink_to(pathlib.Path.home() / ".gitconfig", SCRIPT_DIR / "data" / "dot_gitconfig")
-    force_symlink_to(pathlib.Path.home() / ".gitignore", SCRIPT_DIR / "data" / "dot_gitignore")
-    force_symlink_to(pathlib.Path.home() / ".local" / "bin" / "git-pr", SCRIPT_DIR / "data" / "git-pr")
+    force_symlink_to(
+        pathlib.Path.home() / ".gitconfig", SCRIPT_DIR / "data" / "dot_gitconfig"
+    )
+    force_symlink_to(
+        pathlib.Path.home() / ".gitignore", SCRIPT_DIR / "data" / "dot_gitignore"
+    )
+    force_symlink_to(
+        pathlib.Path.home() / ".local" / "bin" / "git-pr",
+        SCRIPT_DIR / "data" / "git-pr",
+    )
 
 
 def force_symlink_to(source: pathlib.Path, target: pathlib.Path) -> None:
@@ -22,7 +29,6 @@ def force_symlink_to(source: pathlib.Path, target: pathlib.Path) -> None:
         target.unlink()
 
     source.symlink_to(target)
-        
 
 
 def arg_parse() -> argparse.Namespace:
