@@ -19,7 +19,7 @@
 	ch   = checkout
 	main = !br=$(git default-branch) && git checkout \"$br\" && git pull && git pr
 	st   = status
-	tr   = "log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr)%Creset' --abbrev-commit --date=relative"
+    tr   = "log --graph --decorate --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr)%Creset' --abbrev-commit --date=relative"
 
 [color]
 	branch = auto

@@ -13,5 +13,5 @@ normal = "block"
 select = "underline"
 
 [keys.normal.space.n]
-p = ":read /home/hwasung_lee/.config/helix/templates/template.py"
-s = ":read /home/hwasung_lee/.config/helix/templates/template.sh"
+p = ":read /Users/hwasung_lee/.config/helix/templates/template.py"
+s = ":read /Users/hwasung_lee/.config/helix/templates/template.sh"
