@@ -72,15 +72,64 @@ def try_remove_worktree(branch: str, worktrees: dict[str, str]) -> bool:
     return True
 
 
+def has_remote_ref(branch: str, remote: str = "origin") -> bool:
+    """True iff refs/remotes/<remote>/<branch> exists locally."""
+    return (
+        subprocess.run(
+            ["git", "show-ref", "--verify", "--quiet", f"refs/remotes/{remote}/{branch}"],
+        ).returncode
+        == 0
+    )
+
+
+def squash_merged_into(branch: str, into: str) -> bool:
+    """True iff `branch`'s content is already present in `into` as a squash merge.
+
+    Builds a synthetic commit with `branch`'s tree on top of the merge-base, then
+    asks `git cherry` whether that commit is already in `into`. The `-` prefix
+    means yes (already merged).
+    """
+    try:
+        ancestor = subprocess.run(
+            ["git", "merge-base", into, branch],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        tree = subprocess.run(
+            ["git", "rev-parse", f"{branch}^{{tree}}"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        synthetic = subprocess.run(
+            ["git", "commit-tree", tree, "-p", ancestor, "-m", "_"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        cherry = subprocess.run(
+            ["git", "cherry", into, synthetic],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+    except subprocess.CalledProcessError:
+        return False
+    return cherry.startswith("-")
+
+
 def main() -> None:
     LOGGER.info("Fetching and pruning remote-tracking branches...")
     run_cmd(["git", "fetch", "--prune"])
+
+    default_branch = run_cmd(["git", "default-branch"])
 
     LOGGER.info("Scanning for local branches with deleted (merged) remotes...")
     cmd = [
         "git",
         "for-each-ref",
-        "--format=%(refname:short) %(upstream:track)",
+        "--format=%(refname:short)\t%(upstream:short)\t%(upstream:track)",
         "refs/heads/",
     ]
     output = run_cmd(cmd)
@@ -92,21 +141,35 @@ def main() -> None:
         if not line:
             continue
 
-        parts = line.split(" ", 1)
-        branch = parts[0]
-        tracking_status = parts[1] if len(parts) > 1 else ""
+        fields = line.split("\t")
+        branch = fields[0]
+        upstream = fields[1] if len(fields) > 1 else ""
+        tracking_status = fields[2] if len(fields) > 2 else ""
 
         # Protect main/master branches just in case
-        if branch in ["main", "master"]:
+        if branch in ["main", "master", default_branch]:
             continue
 
-        # If the remote branch was deleted (squash-merged on GitHub), it will say [gone]
-        if "[gone]" in tracking_status:
-            if not try_remove_worktree(branch, worktrees):
-                continue
-            # Force delete (-D) is required because Git doesn't recognize it as officially --merged
-            subprocess.run(["git", "branch", "-D", branch], check=True)
-            deleted_count += 1
+        # Case 1: upstream config exists and remote was deleted ([gone] marker).
+        # Case 2: no upstream config, no remote ref, but content is already in
+        # the default branch — covers branches that were pushed without -u,
+        # squash-merged on GitHub, and the remote ref pruned by `fetch --prune`.
+        gone_with_upstream = "[gone]" in tracking_status
+        orphaned_squash_merged = (
+            not upstream
+            and not has_remote_ref(branch)
+            and squash_merged_into(branch, default_branch)
+        )
+        if not (gone_with_upstream or orphaned_squash_merged):
+            continue
+
+        if not try_remove_worktree(branch, worktrees):
+            continue
+        reason = "[gone]" if gone_with_upstream else "orphaned squash-merge"
+        LOGGER.info("  Deleting %s: %s", reason, branch)
+        # Force delete (-D) is required because Git doesn't recognize it as officially --merged
+        subprocess.run(["git", "branch", "-D", branch], check=True)
+        deleted_count += 1
 
     if deleted_count == 0:
         LOGGER.info("No branches needed pruning.")
