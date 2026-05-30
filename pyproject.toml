@@ -5,3 +5,18 @@ description = "Settings common across machines."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = []
+
+[tool.ruff]
+line-length = 100
+lint.select = [
+    "ANN", # Enable type annotations
+    "B",   # flake8-bugbear (common design flaws/bugs)
+    "C4",  # flake8-comprehensions (better list/dict comprehensions)
+    "E",   # pycodestyle errors (standard PEP 8)
+    "F",   # Pyflakes (unused imports, undefined variables)
+    "I",   # isort (import sorting)
+    "N",   # pep8-naming (naming conventions like CamelCase, snake_case)
+    "RUF", # Ruff-specific rules
+    "UP",  # pyupgrade (upgrades syntax to your target Python version)
+    "W",   # pycodestyle warnings
+]

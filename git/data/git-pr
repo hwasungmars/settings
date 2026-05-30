@@ -1,72 +1,64 @@
 #!/usr/bin/env python3
-# -*- coding: utf8 -*-
 
-"""Prune git branches both remote and local."""
+"""Prune local branches whose remote upstreams have been deleted."""
 
 __author__ = "Hwasung Lee"
 
-
-import subprocess
-import shlex
-import re
 import logging
-import typing as t
+import subprocess
+
+LOGGER = logging.getLogger(__name__)
 
 
-logging.basicConfig(level=logging.INFO)
-LOGGER = logging.getLogger(__file__)
-
-
-def run_then_split(cmd):
-    """Command to execute and split the result of."""
+def run_cmd(cmd: list[str]) -> list[str]:
+    """Execute a command and return its stdout."""
     try:
-        lines = subprocess.run(shlex.split(cmd), capture_output=True, text=True, check=True).stdout.strip().split("\n")
-        return [l.strip() for l in lines if l]
-    except Exception as e:
-        LOGGER.exception("Failed running command: %s\n%s", cmd, p.stderr)
-        raise e
+        return subprocess.run(
+            cmd, capture_output=True, text=True, check=True
+        ).stdout.strip()
+    except subprocess.CalledProcessError as e:
+        LOGGER.exception(f"Failed running command: {' '.join(cmd)}\n{e.stderr}")
+        raise
 
 
-LOGGER.info("Pruning local branches that are merged.")
-for branch in run_then_split("git branch --merged"):
-    # If it is the current branch or `main` we skip the branch.
-    if branch.startswith("*") or branch == "main":
-        continue
+def main() -> None:
+    LOGGER.info("Fetching and pruning remote-tracking branches...")
+    run_cmd(["git", "fetch", "--prune"])
 
-    LOGGER.info("  Deleting branch: %s", branch)
-    subprocess.run(["git", "branch", "--delete", branch], check=True)
+    LOGGER.info("Scanning for local branches with deleted (merged) remotes...")
+    cmd = [
+        "git",
+        "for-each-ref",
+        "--format=%(refname:short) %(upstream:track)",
+        "refs/heads/",
+    ]
+    output = run_cmd(cmd)
 
-LOGGER.info("Pruning local branches that have no diff.")
-for branch in run_then_split("git branch --no-merged"):
-    # If it is the current branch or `main` we skip the branch.
-    if branch.startswith("*") or branch == "main":
-        continue
+    deleted_count = 0
+    for line in output.split("\n"):
+        if not line:
+            continue
 
-    p = subprocess.run(["git", "diff", "--quiet", branch])
-    if p.returncode == 0:
-        LOGGER.info("  Deleting branch: %s", branch)
-        subprocess.run(["git", "branch", "-D", branch])
+        parts = line.split(" ", 1)
+        branch = parts[0]
+        tracking_status = parts[1] if len(parts) > 1 else ""
+
+        # Protect main/master branches just in case
+        if branch in ["main", "master"]:
+            continue
+
+        # If the remote branch was deleted (squash-merged on GitHub), it will say [gone]
+        if "[gone]" in tracking_status:
+            # Force delete (-D) is required because Git doesn't recognize it as officially --merged
+            subprocess.run(["git", "branch", "-D", branch], check=True)
+            deleted_count += 1
+
+    if deleted_count == 0:
+        LOGGER.info("No branches needed pruning.")
+    else:
+        LOGGER.info(f"Successfully pruned {deleted_count} branches.")
 
 
-LOGGER.info("Pruning local squash-merged branches.")
-current_branch=run_then_split("git rev-parse --abbrev-ref HEAD")[0]
-for branch in run_then_split("git for-each-ref refs/heads/ --format=%(refname:short)"):
-    ancestor=run_then_split(f"git merge-base {current_branch} {branch}")[0]
-    commit=run_then_split("git rev-parse %s^{tree}" % branch)[0]
-    temp_tree=run_then_split(f"git commit-tree {commit} -p {ancestor} -m _")[0]
-    result=run_then_split(f"git cherry {current_branch} {temp_tree}")[0]
-    if result.startswith("-"):
-        logging.info("  Deleting branch: %s", branch)
-        run_then_split(f"git branch -D {branch}")
-
-LOGGER.info("Pruning remote branches that are merged.")
-subprocess.run(["git", "fetch", "--prune", "origin"], check=True)
-for branch in run_then_split("git branch -r --merged"):
-    if (
-        branch.startswith("origin/hwasung/")
-    ):
-        branch_name = branch.removeprefix("origin/")
-        try:
-            subprocess.run(["git", "push", "origin", "--delete", branch_name], check=True)
-        except subprocess.CalledProcessError:
-            LOGGER.warning("Failed to delete branch %s, skipping...", branch_name)
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    main()
