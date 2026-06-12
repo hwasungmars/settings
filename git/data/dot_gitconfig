@@ -17,7 +17,7 @@
 	br   = branch
 	can  = "commit --amend --no-edit"
 	ch   = checkout
-	main = !br=$(git default-branch) && git checkout \"$br\" && git pull && git pr
+	main = !br=$(git default-branch) && remote=$(git remote get-url upstream >/dev/null 2>&1 && echo upstream || echo origin) && git checkout \"$br\" && git pull \"$remote\" \"$br\" && git pr
 	st   = status
     tr   = "log --graph --decorate --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr)%Creset' --abbrev-commit --date=relative"
 
