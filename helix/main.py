@@ -19,7 +19,7 @@ def main(args: argparse.Namespace) -> None:
     _ = subprocess.run(["uv", "tool", "install", "ruff"], check=True)
     _ = subprocess.run(["uv", "tool", "install", "ty"], check=True)
     target_config_dir = pathlib.Path.home() / ".config" / "helix"
-    assert not target_config_dir.exists(), f"{target_config_dir} is not empty."
+    assert not target_config_dir.exists(), f"{target_config_dir} already exists."
     source_config_dir = SCRIPT_DIR / "dot_config"
     LOGGER.info("Linking %s -> %s", source_config_dir, target_config_dir)
     target_config_dir.symlink_to(source_config_dir)
