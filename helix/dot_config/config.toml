@@ -5,6 +5,9 @@ auto-save = true
 bufferline = "always"
 clipboard-provider = "termcode"
 rulers = [120]
+soft-wrap.enable = true
+soft-wrap.wrap-at-text-width = true
+text-width = 120
 trim-trailing-whitespace = true
 
 [editor.cursor-shape]
