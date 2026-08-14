@@ -50,3 +50,7 @@
 [checkout]
 	defaultRemote = origin
 
+# Machine specific settings live here, untracked, so a path or credential that only makes sense on
+# one machine never lands in the repo. Last include wins, so keep this at the end.
+[include]
+	path = ~/.gitconfig.local
