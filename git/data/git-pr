@@ -36,6 +36,26 @@ def base_ref() -> str | None:
     return run_cmd(["git", "rev-parse", "--abbrev-ref", f"{default}@{{upstream}}"])
 
 
+def push_remote() -> str:
+    """Remote that topic branches are pushed to.
+
+    Distinct from the default branch's upstream in a fork workflow: `master`
+    tracks `upstream` (the canonical repo) while topic branches live on `origin`
+    (the fork).
+    """
+    return run_cmd(["git", "config", "--get", "remote.pushDefault"]) or "origin"
+
+
+def has_live_remote_branch(branch: str, remote: str) -> bool:
+    """Whether `remote` still carries a branch of this name.
+
+    Reads the remote-tracking ref, so it is only meaningful after a pruning
+    fetch -- which `main` does before calling this.
+    """
+    ref = f"refs/remotes/{remote}/{branch}"
+    return run_cmd(["git", "rev-parse", "--verify", "--quiet", ref]) is not None
+
+
 def merged_on_github(branch: str) -> bool | None:
     """Whether `branch` is the head of a merged PR, according to GitHub.
 
@@ -100,10 +120,11 @@ def main() -> None:
         raise SystemExit(1)
 
     LOGGER.info("Scanning for local branches whose remote was deleted...")
+    # `|` delimits because a branch name cannot contain it, unlike a space.
     cmd = [
         "git",
         "for-each-ref",
-        "--format=%(refname:short) %(upstream:track)",
+        "--format=%(refname:short)|%(upstream:short)",
         "refs/heads/",
     ]
     if (output := run_cmd(cmd)) is None:
@@ -111,6 +132,7 @@ def main() -> None:
         raise SystemExit(1)
 
     base = base_ref()
+    remote = push_remote()
 
     deleted_count = 0
     kept_count = 0
@@ -118,20 +140,29 @@ def main() -> None:
         if not line:
             continue
 
-        parts = line.split(" ", 1)
-        branch = parts[0]
-        tracking_status = parts[1] if len(parts) > 1 else ""
+        branch, _, upstream = line.partition("|")
 
         # Protect main/master branches just in case
         if branch in ["main", "master"]:
             continue
 
+        # No upstream at all means the branch was never pushed, so there is no
+        # merge to detect -- purely local work. Skip before consulting GitHub.
+        if not upstream:
+            continue
+
+        # Ask the push remote directly instead of testing `%(upstream:track)` for
+        # `[gone]`. That older check only fired when a branch tracked its *own*
+        # remote branch, so anything created with `git checkout -b <name>
+        # upstream/master` and pushed without `-u` kept `upstream/master` as its
+        # upstream -- which never goes [gone] -- and was skipped forever, even
+        # after its PR merged and GitHub deleted the remote branch.
+        if has_live_remote_branch(branch, remote):
+            continue
+
         # A deleted remote makes the branch a *candidate* only: it means GitHub is
         # done with the branch, not that the work landed. Remotes also disappear
         # for closed PRs and manual tidying, so confirm the merge before deleting.
-        if "[gone]" not in tracking_status:
-            continue
-
         if not is_merged(branch, base):
             LOGGER.warning(f"{branch}: remote gone but NOT merged, keeping")
             kept_count += 1
