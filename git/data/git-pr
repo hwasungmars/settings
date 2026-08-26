@@ -1,13 +1,48 @@
 #!/usr/bin/env python3
 
-"""Prune local branches whose remote upstreams have been deleted and merged."""
+"""Prune local branches that hold no unique work.
+
+A branch qualifies two ways: the default branch already contains its tip, or every
+pull request for it is finished and its tip sits inside one of their heads. For the
+latter, pull request state on GitHub is the sole authority, which is what makes the
+merge strategy -- squash, rebase, merge commit -- irrelevant here.
+"""
 
 __author__ = "Hwasung Lee"
 
+import json
 import logging
+import os
 import subprocess
+import sys
 
 LOGGER = logging.getLogger(__name__)
+
+# GitHub is finished with a pull request in these states. Any other state, including
+# one this script does not recognise, keeps the branch.
+TERMINAL_STATES = frozenset({"CLOSED", "MERGED"})
+
+# Never deleted whatever their pull requests say. The repository's own default branch
+# joins these at run time.
+PROTECTED_BRANCHES = frozenset({"main", "master"})
+
+# Pull requests requested per branch. `gh` truncates to this silently, and a possibly
+# truncated list cannot establish that every pull request is finished.
+PR_PAGE_SIZE = 100
+
+DEFAULT_REF_PREFIX = "refs/remotes/origin/"
+
+# Per-branch verdicts are coloured: blue for a branch being deleted, green for one held
+# by an open pull request, yellow for every other reason to keep.
+BLUE, GREEN, YELLOW, RESET = "\033[94m", "\033[32m", "\033[33m", "\033[0m"
+# Escapes would corrupt a redirected log, so they are emitted only for a terminal.
+# NO_COLOR is honoured whatever its value, per https://no-color.org.
+COLOUR = sys.stderr.isatty() and "NO_COLOR" not in os.environ
+
+
+def paint(text: str, colour: str) -> str:
+    """Wrap `text` in an ANSI colour, or return it unchanged when colour is off."""
+    return f"{colour}{text}{RESET}" if COLOUR else text
 
 
 def run_cmd(cmd: list[str]) -> str | None:
@@ -16,174 +51,199 @@ def run_cmd(cmd: list[str]) -> str | None:
     Never raises, so callers decide whether a given failure is fatal. Note that a
     successful command with no output returns `""`, not None -- test with
     `is None` rather than truthiness when you need to tell the two apart.
+
+    Failures log at debug; every caller reports the consequence it cares about.
     """
     try:
-        return subprocess.run(
-            cmd, capture_output=True, text=True, check=True
-        ).stdout.strip()
-    except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        # `.exception` records the traceback even though the failure is swallowed,
-        # so a silent None stays traceable. Safe here precisely because we do not
-        # re-raise; pairing `.exception` with a `raise` would print it twice.
-        LOGGER.exception(f"Command failed: {' '.join(cmd)}\n{getattr(e, 'stderr', '')}")
+        completed = subprocess.run(
+            cmd, capture_output=True, text=True, errors="surrogateescape", check=True
+        )
+    except (subprocess.CalledProcessError, OSError) as e:
+        LOGGER.debug(f"Command failed: {' '.join(cmd)}\n{getattr(e, 'stderr', '')}")
         return None
+    return completed.stdout.strip()
 
 
-def base_ref() -> str | None:
-    """Remote-tracking ref of the default branch, e.g. `upstream/master`."""
-    if not (default := run_cmd(["git", "default-branch"])):
-        return None
-    return run_cmd(["git", "rev-parse", "--abbrev-ref", f"{default}@{{upstream}}"])
+def default_branch_ref() -> str | None:
+    """Remote-tracking ref of the repository's default branch, fully qualified.
 
-
-def push_remote() -> str:
-    """Remote that topic branches are pushed to.
-
-    Distinct from the default branch's upstream in a fork workflow: `master`
-    tracks `upstream` (the canonical repo) while topic branches live on `origin`
-    (the fork).
+    Fully qualified because `--short` abbreviates to `remotes/origin/main` when a
+    local branch named `origin/main` exists. A remote-tracking ref rather than the
+    local branch, so work that landed upstream counts whether or not it was pulled.
+    None when the remote records no default.
     """
-    return run_cmd(["git", "config", "--get", "remote.pushDefault"]) or "origin"
+    ref = run_cmd(["git", "symbolic-ref", DEFAULT_REF_PREFIX + "HEAD"])
+    return ref if ref is not None and ref.startswith(DEFAULT_REF_PREFIX) else None
 
 
-def has_live_remote_branch(branch: str, remote: str) -> bool:
-    """Whether `remote` still carries a branch of this name.
+def checked_out_branches() -> set[str]:
+    """Branches checked out in some worktree, which git refuses to delete.
 
-    Reads the remote-tracking ref, so it is only meaningful after a pruning
-    fetch -- which `main` does before calling this.
+    A worktree on a detached HEAD contributes nothing, so a branch paused mid-rebase
+    or mid-bisect is absent; git's own refusal is what keeps those.
     """
-    ref = f"refs/remotes/{remote}/{branch}"
-    return run_cmd(["git", "rev-parse", "--verify", "--quiet", ref]) is not None
+    out = run_cmd(["git", "worktree", "list", "--porcelain"])
+    if out is None:
+        # An empty set would read as "nothing is checked out", so every doomed delete
+        # would be attempted and then counted as a failure.
+        LOGGER.error("Could not list worktrees.")
+        raise SystemExit(1)
+    prefix = "branch refs/heads/"
+    # Split on newline alone: `splitlines()` would also break on U+0085 and U+2028,
+    # which a ref name may legally contain.
+    return {line.removeprefix(prefix) for line in out.split("\n") if line.startswith(prefix)}
 
 
-def merged_on_github(branch: str) -> bool | None:
-    """Whether `branch` is the head of a merged PR, according to GitHub.
+def pull_requests(branch: str) -> list[dict[str, str]] | None:
+    """State and head commit of every pull request having `branch` as its head.
 
-    GitHub is the authority that performed the merge, so this is the only check
-    that is immune to the merge strategy (squash, rebase, merge commit) and to
-    conflicts resolved during the merge.
-
-    Returns None if GitHub could not be consulted (`gh` missing, unauthenticated,
-    offline), so the caller can fall back to a local check.
+    An empty list means no pull request was ever opened for it. Returns None when
+    GitHub could not be consulted (`gh` missing, unauthenticated, offline) or
+    answered with something other than the requested JSON, either of which is
+    distinct from a definitive "no pull requests".
     """
     out = run_cmd(
-        ["gh", "pr", "list", "--head", branch, "--state", "merged", "--json", "number"]
+        [
+            "gh", "pr", "list",
+            "--head", branch,
+            "--state", "all",
+            "--limit", str(PR_PAGE_SIZE),
+            "--json", "state,headRefOid",
+        ]
     )
     if out is None:
         return None
-    return out not in ("", "[]")
+    try:
+        prs = json.loads(out)
+    except json.JSONDecodeError:
+        LOGGER.debug(f"{branch}: gh returned non-JSON output: {out!r}")
+        return None
+    return prs if isinstance(prs, list) else None
 
 
-def merged_locally(branch: str, base: str) -> bool:
-    """Whether `branch`'s cumulative diff is already present in `base`.
+def is_contained_in(tip: str, commit: str) -> bool:
+    """Whether `tip` is `commit` or one of its ancestors.
 
-    A squash merge collapses N commits into one, so none of the branch's original
-    commits match by patch-id and a plain `git cherry` misses the branch whenever
-    it held more than one commit. Synthesising a single commit for the branch's
-    entire diff against the merge base restores the patch-id match.
+    False when either object is missing from the clone: containment cannot be
+    established, and "not established" has to read as "not contained".
     """
-    if not (merge_base := run_cmd(["git", "merge-base", base, branch])):
-        return False
-    synthetic = run_cmd(
-        ["git", "commit-tree", f"{branch}^{{tree}}", "-p", merge_base, "-m", "_"]
-    )
-    if not synthetic:
-        return False
-    if not (cherry := run_cmd(["git", "cherry", base, synthetic])):
-        return False
-    # `-` means an equivalent patch is already upstream; `+` means it is not.
-    return cherry.startswith("-")
+    return run_cmd(["git", "merge-base", "--is-ancestor", tip, commit]) is not None
 
 
-def is_merged(branch: str, base: str | None) -> bool:
-    """Whether `branch` was merged, preferring GitHub as the source of truth."""
-    if (verdict := merged_on_github(branch)) is not None:
-        return verdict
-    if base is None:
-        LOGGER.warning(f"{branch}: no GitHub answer and no base ref to compare against")
-        return False
-    LOGGER.info(f"{branch}: GitHub unavailable, falling back to local patch check")
-    return merged_locally(branch, base)
+def prune_reason(branch: str, tip: str, default_ref: str | None) -> str | None:
+    """Why deleting `branch` at commit `tip` would lose nothing, or None to keep it.
+
+    An unfinished pull request vetoes both qualifying rules. Pull requests are
+    consulted first, so an unreachable GitHub keeps every branch even though the
+    `default_ref` rule needs no network.
+
+    Logs its own reason for keeping a branch. A reason for deleting is returned
+    rather than logged, so the caller can report it and the deletion on one line.
+    """
+    prs = pull_requests(branch)
+    if prs is None:
+        LOGGER.warning(paint(f"{branch}: GitHub unreachable, keeping", YELLOW))
+        return None
+    if len(prs) >= PR_PAGE_SIZE:
+        truncated = f"{branch}: over {PR_PAGE_SIZE} pull requests, list may be short, keeping"
+        LOGGER.warning(paint(truncated, YELLOW))
+        return None
+    # A reopened branch's fresh pull request outranks any number of finished ones, and
+    # outranks the default branch already holding the work.
+    if any(pr["state"] not in TERMINAL_STATES for pr in prs):
+        LOGGER.info(paint(f"{branch}: pull request still open, keeping", GREEN))
+        return None
+
+    # This rule reaches branches no pull request names -- a review checkout, a bookmark
+    # into the default branch's history -- which the head-commit test below never matches.
+    if default_ref is not None and is_contained_in(tip, default_ref):
+        upstream = default_ref.removeprefix("refs/remotes/")
+        return f"already contained in {upstream}"
+
+    if not prs:
+        LOGGER.info(paint(f"{branch}: no pull request, keeping", YELLOW))
+        return None
+    # `gh pr list --head` matches on branch name alone, so another author's branch of the
+    # same name matches just as well; containment is what ties a finished pull request to
+    # this ref. Containment rather than equality because a head advances server-side --
+    # the "Update branch" button, say -- leaving a local tip behind it but inside it.
+    if any(is_contained_in(tip, pr["headRefOid"]) for pr in prs):
+        return "every pull request finished"
+    unmatched = f"{branch}: tip is not inside a finished pull request's head, keeping"
+    LOGGER.info(paint(unmatched, YELLOW))
+    return None
 
 
 def main() -> None:
     LOGGER.info("Fetching and pruning remote-tracking branches...")
-    # `--all` is required: a bare `git fetch --prune` only prunes the *current
-    # branch's* remote. `git main` runs this from the default branch, which here
-    # tracks `upstream`, so stale refs under `origin` (the fork the topic branches
-    # track) were never pruned and their `upstream:track` stayed empty rather than
-    # going [gone].
-    if run_cmd(["git", "fetch", "--prune", "--all"]) is None:
-        # Bail rather than scan stale refs: a branch whose remote is really gone
-        # would still look alive, so nothing would be pruned anyway.
-        LOGGER.error("Fetch failed; refusing to scan possibly stale refs.")
-        raise SystemExit(1)
+    # `--all` is required: a bare `git fetch --prune` only prunes the current branch's
+    # remote, leaving stale refs under every other remote.
+    fetched = run_cmd(["git", "fetch", "--prune", "--all"]) is not None
+    if not fetched:
+        LOGGER.warning("Fetch failed; remote-tracking refs may be stale.")
+    # A fetch leaves `origin/HEAD` alone once it is set, so it outlives a rename of the
+    # upstream default branch and has to be refreshed on its own.
+    run_cmd(["git", "remote", "set-head", "origin", "--auto"])
 
-    LOGGER.info("Scanning for local branches whose remote was deleted...")
-    # `|` delimits because a branch name cannot contain it, unlike a space.
-    cmd = [
-        "git",
-        "for-each-ref",
-        "--format=%(refname:short)|%(upstream:short)",
-        "refs/heads/",
-    ]
+    LOGGER.info("Checking local branches for unique work...")
+    # `lstrip=2` rather than `refname:short`, which prefixes `heads/` when a tag shares
+    # the branch's name -- a name GitHub would not recognise. The tip is read here so the
+    # hash in the restore hint is the one that was validated.
+    cmd = ["git", "for-each-ref", "--format=%(refname:lstrip=2) %(objectname)", "refs/heads/"]
     if (output := run_cmd(cmd)) is None:
         LOGGER.error("Could not list local branches.")
         raise SystemExit(1)
 
-    base = base_ref()
-    remote = push_remote()
+    default_ref = default_branch_ref()
+    protected = set(PROTECTED_BRANCHES)
+    if default_ref is not None:
+        protected.add(default_ref.removeprefix(DEFAULT_REF_PREFIX))
+    if not fetched:
+        # An upstream rewrite would leave this ref ahead of the real default branch, so
+        # containment would claim work is durable when it is not.
+        default_ref = None
+    checked_out = checked_out_branches()
 
-    deleted_count = 0
-    kept_count = 0
+    deleted = 0
+    failed = 0
     for line in output.split("\n"):
         if not line:
             continue
+        # ASCII space is the one whitespace character a ref name cannot hold, so this is
+        # exact where `split()` would also break on U+00A0 and its kin.
+        branch, tip = line.rsplit(" ", 1)
 
-        branch, _, upstream = line.partition("|")
-
-        # Protect main/master branches just in case
-        if branch in ["main", "master"]:
+        if branch in protected:
             continue
 
-        # No upstream at all means the branch was never pushed, so there is no
-        # merge to detect -- purely local work. Skip before consulting GitHub.
-        if not upstream:
+        reason = prune_reason(branch, tip, default_ref)
+        if reason is None:
             continue
 
-        # Ask the push remote directly instead of testing `%(upstream:track)` for
-        # `[gone]`. That older check only fired when a branch tracked its *own*
-        # remote branch, so anything created with `git checkout -b <name>
-        # upstream/master` and pushed without `-u` kept `upstream/master` as its
-        # upstream -- which never goes [gone] -- and was skipped forever, even
-        # after its PR merged and GitHub deleted the remote branch.
-        if has_live_remote_branch(branch, remote):
+        if branch in checked_out:
+            LOGGER.warning(paint(f"{branch}: {reason} but it is checked out, keeping", YELLOW))
             continue
 
-        # A deleted remote makes the branch a *candidate* only: it means GitHub is
-        # done with the branch, not that the work landed. Remotes also disappear
-        # for closed PRs and manual tidying, so confirm the merge before deleting.
-        if not is_merged(branch, base):
-            LOGGER.warning(f"{branch}: remote gone but NOT merged, keeping")
-            kept_count += 1
+        # `-D` drops the branch's reflog along with the ref, so log the hash as the local
+        # handle on what was deleted. One record with a break in it, since the restore
+        # command is long enough to bury the verdict.
+        message = f"{branch}: {reason}, deleting\n(restore: git branch {branch} {tip})"
+        LOGGER.info(paint(message, BLUE))
+        # Force delete because a squash-merged branch is not `--merged` as git sees it.
+        if run_cmd(["git", "branch", "-D", branch]) is None:
+            LOGGER.warning(paint(f"{branch}: delete failed, keeping", YELLOW))
+            failed += 1
             continue
+        deleted += 1
 
-        LOGGER.info(f"{branch}: merged, deleting")
-        # Force delete (-D) is required because Git doesn't recognize it as officially --merged.
-        # git prints "Deleted branch <name> (was <sha>)"; that sha is the recovery
-        # handle, since -D removes the branch's own reflog along with the ref.
-        subprocess.run(["git", "branch", "-D", branch], check=True)
-        deleted_count += 1
-
-    if deleted_count == 0:
+    if deleted:
+        LOGGER.info(f"Pruned {deleted} branch(es).")
+    elif not failed:
         LOGGER.info("No branches needed pruning.")
-    else:
-        LOGGER.info(f"Successfully pruned {deleted_count} branches.")
-    if kept_count:
-        LOGGER.warning(
-            f"{kept_count} branch(es) had a deleted remote but were not merged. "
-            "Delete manually with `git branch -D <branch>` if that is intended."
-        )
+    # Exit non-zero so a caller sees the failure rather than a clean run that simply had
+    # nothing to prune.
+    if failed:
+        raise SystemExit(f"{failed} branch(es) could not be deleted.")
 
 
 if __name__ == "__main__":
