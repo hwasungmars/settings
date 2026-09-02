@@ -7,7 +7,7 @@ import logging
 import pathlib
 
 LOGGER = logging.getLogger(__name__)
-SCRIPT_DIR = pathlib.Path(__file__).parent
+SCRIPT_DIR = pathlib.Path(__file__).resolve().parent
 
 
 def main(args: argparse.Namespace) -> None:
