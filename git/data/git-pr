@@ -177,8 +177,11 @@ def prune_reason(branch: str, tip: str, default_ref: str | None) -> str | None:
 def main() -> None:
     LOGGER.info("Fetching and pruning remote-tracking branches...")
     # `--all` is required: a bare `git fetch --prune` only prunes the current branch's
-    # remote, leaving stale refs under every other remote.
-    fetched = run_cmd(["git", "fetch", "--prune", "--all"]) is not None
+    # remote, leaving stale refs under every other remote. Run directly rather than
+    # through run_cmd, which captures output: that swallows git's own progress meter,
+    # so a fetch of refs never pulled before -- tens of thousands of objects -- looks
+    # hung instead of streaming.
+    fetched = subprocess.run(["git", "fetch", "--prune", "--all"]).returncode == 0
     if not fetched:
         LOGGER.warning("Fetch failed; remote-tracking refs may be stale.")
     # A fetch leaves `origin/HEAD` alone once it is set, so it outlives a rename of the
