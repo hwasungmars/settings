@@ -3,7 +3,7 @@
 	autoSetupRemote = true
 
 [pull]
-	default = current
+	ff = only
 
 [rebase]
 	autoStash = true
@@ -20,13 +20,6 @@
 	main = !br=$(git default-branch) && remote=$(git remote get-url upstream >/dev/null 2>&1 && echo upstream || echo origin) && git checkout \"$br\" && git pull \"$remote\" \"$br\" && git pr
 	st   = status
     tr   = "log --graph --decorate --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr)%Creset' --abbrev-commit --date=relative"
-
-[color]
-	branch = auto
-	diff   = auto
-	pager  = true
-	status = auto
-	ui     = true
 
 [color "diff"]
 	frag = magenta bold
