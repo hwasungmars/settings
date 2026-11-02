@@ -1,0 +1,11 @@
+{
+  "name": "assistant",
+  "displayName": "Personal Assistant",
+  "description": "Personal-assistant workflows that combine the email and calendar plugins: daily briefing, weekly review, scheduling requests, invitations and deadline reminders.",
+  "version": "1.0.0",
+  "suggestedPrompts": [
+    "Give me my daily briefing",
+    "Run my weekly review",
+    "Find a time to answer this meeting request"
+  ]
+}

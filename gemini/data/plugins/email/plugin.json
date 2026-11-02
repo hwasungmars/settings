@@ -1,0 +1,12 @@
+{
+  "name": "email",
+  "displayName": "Email",
+  "description": "Triage, categorise, label and unsubscribe Gmail inbox messages, and draft, reply to and send emails, using the Email MCP server.",
+  "version": "1.3.0",
+  "suggestedPrompts": [
+    "Triage my Gmail inbox and propose categories",
+    "Check my Gmail authentication status and total inbox counts",
+    "Reply to an email thread and archive it",
+    "Unsubscribe from promotional senders and archive their emails"
+  ]
+}
