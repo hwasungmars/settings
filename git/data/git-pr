@@ -26,6 +26,11 @@ TERMINAL_STATES = frozenset({"CLOSED", "MERGED"})
 # joins these at run time.
 PROTECTED_BRANCHES = frozenset({"main", "master"})
 
+# Protected by prefix. A release branch tracks an upstream branch rather than holding
+# work of its own, and a freshly cut one is contained in the default branch, which would
+# otherwise qualify it for deletion.
+PROTECTED_PREFIXES = ("release/",)
+
 # Pull requests requested per branch. `gh` truncates to this silently, and a possibly
 # truncated list cannot establish that every pull request is finished.
 PR_PAGE_SIZE = 100
@@ -216,7 +221,7 @@ def main() -> None:
         # exact where `split()` would also break on U+00A0 and its kin.
         branch, tip = line.rsplit(" ", 1)
 
-        if branch in protected:
+        if branch in protected or branch.startswith(PROTECTED_PREFIXES):
             continue
 
         reason = prune_reason(branch, tip, default_ref)

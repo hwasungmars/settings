@@ -9,7 +9,6 @@
 # appends this same line to ~/.zshrc.
 . "$HOME/.local/bin/env"
 
-alias claude='claude --effort max'
 alias k='kubectl'
 
 export COLORTERM=truecolor
