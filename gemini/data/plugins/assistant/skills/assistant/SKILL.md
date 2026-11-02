@@ -76,7 +76,11 @@ Trigger: "daily/morning briefing", "what's on today", or a scheduled run.
 5. **Deadlines (next 7 days)**: from the inbox snapshot, list messages that mention a due date, expiry or event in
    the next 7 days, and check `gcalendar readonly search "Due:" --max 20 --json` so you can say whether a reminder
    already exists.
-6. **Output** — keep it to one screen:
+6. **Executive Reading Docket (Research & Newsletters)**:
+   - Run `python3 ~/.gemini/config/plugins/assistant/skills/research/scripts/fetch_papers.py --days 2 --min-upvotes 0 --format json`
+     and screen against `research/references/breakthrough_rubric.md`. Select top 1–2 Tier 1 algorithmic breakthroughs with arXiv links.
+   - Note any unread Tier 1 AI newsletters from the inbox (Interconnects, Ahead of AI, The Batch, Deep Learning Focus) for reading during focus time.
+7. **Output** — keep it to one screen:
 
    ```text
    ## Today — <weekday, date>
@@ -88,6 +92,9 @@ Trigger: "daily/morning briefing", "what's on today", or a scheduled run.
 
    ## Waiting on (<n> overdue)
    - <recipient>: <subject> — sent <n> days ago
+
+   ## Executive Reading Docket
+   - <Paper/Newsletter>: <one-sentence key innovation or takeaway>
 
    ## Coming up (7 days)
    - <date>: <deadline/event> — reminder: yes/no
@@ -111,7 +118,9 @@ Trigger: "weekly review", "plan my week", or a scheduled Friday/Sunday run.
 3. **Stale to-dos**: inbox messages labelled `Triage/Needs Reply` older than 7 days — ask: reply, delegate, defer
    (reminder) or archive?
 4. **Deadlines (next 14 days)** without a `Due:` reminder.
-5. End with numbered proposed actions.
+5. **Weekly Research Review**: Run `python3 ~/.gemini/config/plugins/assistant/skills/research/scripts/fetch_papers.py --days 7 --min-upvotes 0 --format json`
+   and screen against `research/references/breakthrough_rubric.md`. Select the top 2–3 algorithmic papers of the week for weekend or next-week reading.
+6. End with numbered proposed actions.
 
 ## Workflow C — Inbound Meeting Request
 

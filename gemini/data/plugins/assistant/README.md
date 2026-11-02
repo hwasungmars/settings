@@ -1,16 +1,21 @@
-# Personal Assistant Plugin (`assistant`)
+# Personal Assistant & Research Plugin (`assistant`)
 
-Workflows that span the `email` plugin (Gmail MCP server) and the `calendar` plugin (`gcalendar` CLI from the
-Agent Marketplace). Kept separate so the Marketplace calendar plugin stays unmodified and can update cleanly.
+Bundles personal-assistant workflows spanning the `email` plugin (Gmail MCP server), `calendar` plugin (`gcalendar` CLI), and the frontier AI `research` skill for arXiv/Hugging Face paper curation.
 
 ```text
 assistant/
 ├── plugin.json
 └── skills/
-    └── assistant/
-        ├── SKILL.md                         # Briefing, weekly review, scheduling, invitations, deadlines
+    ├── assistant/                           # Briefing, weekly review, scheduling, invitations, deadlines
+    │   ├── SKILL.md
+    │   ├── scripts/find_slots.py            # Deterministic calendar slot calculator
+    │   └── references/calendar-preferences.md
+    └── research/                            # Frontier AI paper triage (LLM post-training, RL, inference)
+        ├── SKILL.md
+        ├── scripts/fetch_papers.py          # Dual-source arXiv & Hugging Face paper fetcher
         └── references/
-            └── calendar-preferences.md      # Working hours, protected time, meeting defaults
+            ├── breakthrough_rubric.md       # 3-tier mathematical & algorithmic evaluation standard
+            └── preferences.md               # User technical domains & focus areas
 ```
 
 Requires both the `email` and `calendar` plugins to be enabled.
