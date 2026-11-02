@@ -1,11 +1,11 @@
 {
   "name": "assistant",
   "displayName": "Personal Assistant",
-  "description": "Personal-assistant and research workflows combining email, calendar, and frontier AI paper triage: daily briefing with reading docket, weekly review, scheduling, and algorithmic breakthroughs.",
-  "version": "1.1.0",
+  "description": "Personal-assistant orchestrator combining email, calendar, and research: daily executive briefing, weekly review, smart scheduling, and deadline reminders.",
+  "version": "1.2.0",
   "suggestedPrompts": [
     "Give me my daily briefing",
     "Run my weekly review",
-    "Triage recent algorithmic breakthroughs"
+    "Find a time to answer this meeting request"
   ]
 }

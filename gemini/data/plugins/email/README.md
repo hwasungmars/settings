@@ -7,7 +7,7 @@ A self-contained Antigravity **Plugin** bundling the `email` skill, inbox triage
 ```text
 email/
 ├── plugin.json                            # Plugin manifest
-├── mcp_config.json                        # Registers the `email` MCP server
+├── mcp_config.json                        # Registers the `gmail` MCP server (namespaced as `email_gmail`)
 ├── rules/
 │   └── AGENTS.md                          # Always-on Gmail triage rules when plugin is enabled
 ├── skills/

@@ -1,0 +1,11 @@
+{
+  "name": "research",
+  "displayName": "Research",
+  "description": "Frontier AI paper intelligence: dual-source arXiv and Hugging Face Daily Papers triage for LLM post-training, reinforcement learning, and inference optimisation.",
+  "version": "1.0.0",
+  "suggestedPrompts": [
+    "Triage recent algorithmic breakthroughs",
+    "Check arXiv for inference optimisation papers",
+    "Evaluate an arXiv paper against the breakthrough rubric"
+  ]
+}

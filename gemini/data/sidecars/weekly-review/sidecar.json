@@ -5,14 +5,14 @@
     "agentapi",
     "new-conversation",
     "--",
-    "Run Hwasung's Friday weekly review (hwasungmars@gmail.com) using the assistant and research skills. Use British English. This run is READ-ONLY for the inbox: never send, archive, label, mark read or delete any email. Use only data returned by tools; if a source is unavailable, say so rather than guessing.\n\n1. REPLIED & WAITING: Call gmail_fetch_inbox with query 'label:Triage/Replied newer_than:7d' and list the threads replied to this week. Also call gmail_fetch_inbox with query 'label:\"Triage/Waiting\"' and list threads awaiting response past the 5-day threshold.\n\n2. STILL OUTSTANDING: Call gmail_fetch_inbox with query 'label:\"Triage/Needs Reply\"' and list messages that still need action. Also list any unsent drafts via query 'in:drafts'. Note the age of the oldest outstanding item.\n\n3. WEEKLY RESEARCH: Run python3 /Users/hwasung_lee/.gemini/config/plugins/assistant/skills/research/scripts/fetch_papers.py --days 7 --min-upvotes 0 --format json and screen against breakthrough_rubric.md. List the top 3 papers of the week (arXiv link, one-sentence summary from abstract) as weekend or next-week reading.\n\n4. WEEK AHEAD: Using 'gcalendar readonly events --cal <id> --date <YYYY-MM-DD> --max 50 --json' for each day from tomorrow to the following Friday across the primary calendar (hwasungmars@gmail.com), linked Apple Calendar feed (opnnnoego3kj1shmrcpc57jajpjg19dk@import.calendar.google.com) and Family calendar (family13379542018784707698@group.calendar.google.com), summarise next week's commitments and highlight busy days and clashes.\n\n5. CREATE THE EVENT: Find a free 30-minute window today between 15:30 and 18:00 on all three calendars. If an event titled 'Weekly Review' already exists that day, update it instead of creating a duplicate. Otherwise create 'Weekly Review' on the primary calendar (no attendees) with the sections: REPLIED THIS WEEK, WAITING ON, STILL OUTSTANDING, WEEKEND PAPERS, WEEK AHEAD. If no window is free, create it for the next free 30 minutes on Monday morning."
+    "Run Hwasung's Friday weekly review (hwasungmars@gmail.com) using the assistant and research skills. Use British English. This run is READ-ONLY for the inbox: never send, archive, label, mark read or delete any email. Use only data returned by tools; if a source is unavailable, say so rather than guessing.\n\n1. REPLIED & WAITING: Call gmail_fetch_inbox with query 'label:Triage/Replied newer_than:7d' and list the threads replied to this week. Also call gmail_fetch_inbox with query 'label:\"Triage/Waiting\"' and list threads awaiting response past the 5-day threshold.\n\n2. STILL OUTSTANDING: Call gmail_fetch_inbox with query 'label:\"Triage/Needs Reply\"' and list messages that still need action. Also list any unsent drafts via query 'in:drafts'. Note the age of the oldest outstanding item.\n\n3. WEEKLY RESEARCH: Run python3 /Users/hwasung_lee/.gemini/config/plugins/research/skills/research/scripts/fetch_papers.py --days 7 --min-upvotes 0 --format json and screen against breakthrough_rubric.md. List the top 3 papers of the week (arXiv link, one-sentence summary from abstract) as weekend or next-week reading.\n\n4. WEEK AHEAD: Using 'gcalendar readonly events --cal <id> --date <YYYY-MM-DD> --max 50 --json' for each day from tomorrow to the following Friday across the primary calendar (hwasungmars@gmail.com), linked Apple Calendar feed (opnnnoego3kj1shmrcpc57jajpjg19dk@import.calendar.google.com) and Family calendar (family13379542018784707698@group.calendar.google.com), summarise next week's commitments and highlight busy days and clashes.\n\n5. CREATE THE EVENT: Find a free 30-minute window today between 15:30 and 18:00 on all three calendars. If an event titled 'Weekly Review' already exists that day, update it instead of creating a duplicate. Otherwise create 'Weekly Review' on the primary calendar (no attendees) with the sections: REPLIED THIS WEEK, WAITING ON, STILL OUTSTANDING, WEEKEND PAPERS, WEEK AHEAD. If no window is free, create it for the next free 30 minutes on Monday morning."
   ],
   "restart_policy": "always",
   "display_name": "Weekly Review",
   "description": "Every Friday at 3:00 PM (America/Los_Angeles), summarises the week's replies, waiting-on items, outstanding emails, top papers via the research skill, and next week's calendar into a 30-minute 'Weekly Review' event.",
   "agent_permissions": {
     "access_grants": [
-      "command(python3 /Users/hwasung_lee/.gemini/config/plugins/assistant/skills/research/scripts/fetch_papers.py)",
+      "command(python3 /Users/hwasung_lee/.gemini/config/plugins/research/skills/research/scripts/fetch_papers.py)",
       "command(python3 /Users/hwasung_lee/.gemini/config/plugins/assistant/skills/assistant/scripts/find_slots.py)",
       "command(gcalendar readonly events)",
       "command(gcalendar readonly calendars)",
@@ -21,11 +21,11 @@
       "command(gcalendar mutate update)",
       "read_file(/Users/hwasung_lee/.gemini/config/plugins/email/skills/email/references/preferences.md)",
       "read_file(/Users/hwasung_lee/.gemini/config/plugins/assistant/skills/assistant/references/calendar-preferences.md)",
-      "read_file(/Users/hwasung_lee/.gemini/config/plugins/assistant/skills/research/references/breakthrough_rubric.md)",
-      "read_file(/Users/hwasung_lee/.gemini/config/plugins/assistant/skills/research/references/preferences.md)",
-      "mcp(email_email/gmail_fetch_inbox)",
-      "mcp(email_email/gmail_get_message)",
-      "mcp(email_email/gmail_auth_status)",
+      "read_file(/Users/hwasung_lee/.gemini/config/plugins/research/skills/research/references/breakthrough_rubric.md)",
+      "read_file(/Users/hwasung_lee/.gemini/config/plugins/research/skills/research/references/preferences.md)",
+      "mcp(email_gmail/gmail_fetch_inbox)",
+      "mcp(email_gmail/gmail_get_message)",
+      "mcp(email_gmail/gmail_auth_status)",
       "read_url(arxiv.org)",
       "read_url(huggingface.co)"
     ]

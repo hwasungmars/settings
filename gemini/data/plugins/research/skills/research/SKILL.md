@@ -30,13 +30,13 @@ Execute the dual-source fetch script over the desired review window (default: pa
 
 ```bash
 # Standard 7-day review:
-python3 ~/.gemini/config/plugins/assistant/skills/research/scripts/fetch_papers.py --days 7 --min-upvotes 0 --format json
+python3 ~/.gemini/config/plugins/research/skills/research/scripts/fetch_papers.py --days 7 --min-upvotes 0 --format json
 
 # Or backtest a specific historical date window:
-python3 ~/.gemini/config/plugins/assistant/skills/research/scripts/fetch_papers.py --start-date 2026-09-17 --end-date 2026-09-24 --format json
+python3 ~/.gemini/config/plugins/research/skills/research/scripts/fetch_papers.py --start-date 2026-09-17 --end-date 2026-09-24 --format json
 
 # Or evaluate a specific arXiv ID directly:
-python3 ~/.gemini/config/plugins/assistant/skills/research/scripts/fetch_papers.py --id 2609.20807
+python3 ~/.gemini/config/plugins/research/skills/research/scripts/fetch_papers.py --id 2609.20807
 ```
 
 **Supported Options**:

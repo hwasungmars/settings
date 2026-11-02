@@ -11,7 +11,7 @@ description: >-
 
 # Gmail Inbox Triage Skill (`email`)
 
-Tools (`email` MCP server): `gmail_auth_status`, `gmail_authenticate`, `gmail_list_labels`,
+Tools (`email_gmail` MCP server): `gmail_auth_status`, `gmail_authenticate`, `gmail_list_labels`,
 `gmail_ensure_labels`, `gmail_fetch_inbox`, `gmail_get_message`, `gmail_batch_triage`, `gmail_unsubscribe`,
 `gmail_reply`, `gmail_create_draft`, `gmail_send_draft`, `gmail_send_message`.
 

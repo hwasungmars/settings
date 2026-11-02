@@ -11,11 +11,12 @@ description: >-
 
 # Personal Assistant (`assistant`)
 
-This skill orchestrates two other skills. **Read them before acting** — their safety rules still apply:
+This skill orchestrates three core capability skills. **Read them before acting** — their safety rules still apply:
 
-- `email` skill — Gmail MCP tools (`gmail_fetch_inbox`, `gmail_get_message`, `gmail_reply`, `gmail_batch_triage`, …),
+- `email` skill — `email_gmail` MCP tools (`gmail_fetch_inbox`, `gmail_get_message`, `gmail_reply`, `gmail_batch_triage`, …),
   the classification checklist and `references/preferences.md` (reply style, nudge threshold).
 - `calendar` skill — the `gcalendar` CLI (setup, authentication, `readonly` / `mutate` commands).
+- `research` skill — dual-source arXiv and Hugging Face paper fetcher and 3-tier breakthrough rubric.
 
 Also read [`references/calendar-preferences.md`](references/calendar-preferences.md) every time: time zone, offerable
 hours, meeting defaults, hold and reminder conventions.
@@ -77,7 +78,7 @@ Trigger: "daily/morning briefing", "what's on today", or a scheduled run.
    the next 7 days, and check `gcalendar readonly search "Due:" --max 20 --json` so you can say whether a reminder
    already exists.
 6. **Executive Reading Docket (Research & Newsletters)**:
-   - Run `python3 ~/.gemini/config/plugins/assistant/skills/research/scripts/fetch_papers.py --days 2 --min-upvotes 0 --format json`
+   - Run `python3 ~/.gemini/config/plugins/research/skills/research/scripts/fetch_papers.py --days 2 --min-upvotes 0 --format json`
      and screen against `research/references/breakthrough_rubric.md`. Select top 1–2 Tier 1 algorithmic breakthroughs with arXiv links.
    - Note any unread Tier 1 AI newsletters from the inbox (Interconnects, Ahead of AI, The Batch, Deep Learning Focus) for reading during focus time.
 7. **Output** — keep it to one screen:
@@ -118,7 +119,7 @@ Trigger: "weekly review", "plan my week", or a scheduled Friday/Sunday run.
 3. **Stale to-dos**: inbox messages labelled `Triage/Needs Reply` older than 7 days — ask: reply, delegate, defer
    (reminder) or archive?
 4. **Deadlines (next 14 days)** without a `Due:` reminder.
-5. **Weekly Research Review**: Run `python3 ~/.gemini/config/plugins/assistant/skills/research/scripts/fetch_papers.py --days 7 --min-upvotes 0 --format json`
+5. **Weekly Research Review**: Run `python3 ~/.gemini/config/plugins/research/skills/research/scripts/fetch_papers.py --days 7 --min-upvotes 0 --format json`
    and screen against `research/references/breakthrough_rubric.md`. Select the top 2–3 algorithmic papers of the week for weekend or next-week reading.
 6. End with numbered proposed actions.
 

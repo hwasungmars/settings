@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "email": {
+    "gmail": {
       "command": "/usr/bin/python3",
       "args": [
         "/Users/hwasung_lee/.gemini/config/plugins/email/mcp_server/gmail_mcp_server.py"
