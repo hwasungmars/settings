@@ -81,22 +81,47 @@ def default_branch_ref() -> str | None:
     return ref if ref is not None and ref.startswith(DEFAULT_REF_PREFIX) else None
 
 
-def checked_out_branches() -> set[str]:
-    """Branches checked out in some worktree, which git refuses to delete.
+def checked_out_branches() -> dict[str, str | None]:
+    """Branches checked out in some worktree, mapped to that worktree's path.
 
-    A worktree on a detached HEAD contributes nothing, so a branch paused mid-rebase
-    or mid-bisect is absent; git's own refusal is what keeps those.
+    The path is None for the main worktree, which cannot be removed, so a branch
+    checked out there is kept. A worktree on a detached HEAD contributes nothing, so a
+    branch paused mid-rebase or mid-bisect is absent; git's own refusal is what keeps
+    those.
     """
     out = run_cmd(["git", "worktree", "list", "--porcelain"])
     if out is None:
-        # An empty set would read as "nothing is checked out", so every doomed delete
+        # An empty map would read as "nothing is checked out", so every doomed delete
         # would be attempted and then counted as a failure.
         LOGGER.error("Could not list worktrees.")
         raise SystemExit(1)
-    prefix = "branch refs/heads/"
-    # Split on newline alone: `splitlines()` would also break on U+0085 and U+2028,
-    # which a ref name may legally contain.
-    return {line.removeprefix(prefix) for line in out.split("\n") if line.startswith(prefix)}
+    branches: dict[str, str | None] = {}
+    # Records are separated by blank lines, and the main worktree's comes first. Split
+    # on newline alone: `splitlines()` would also break on U+0085 and U+2028, which a
+    # ref name may legally contain.
+    for index, record in enumerate(out.split("\n\n")):
+        path = branch = None
+        for line in record.split("\n"):
+            if line.startswith("worktree "):
+                path = line.removeprefix("worktree ")
+            elif line.startswith("branch refs/heads/"):
+                branch = line.removeprefix("branch refs/heads/")
+        if branch is not None:
+            branches[branch] = None if index == 0 else path
+    return branches
+
+
+def remove_worktree(branch: str, path: str) -> bool:
+    """Remove the linked worktree at `path` that holds `branch`, logging the outcome.
+
+    Without `--force`, git refuses a worktree with uncommitted or untracked changes,
+    or a locked one, so nothing unsaved is lost.
+    """
+    if run_cmd(["git", "worktree", "remove", path]) is None:
+        LOGGER.warning(paint(f"{branch}: worktree {path} is dirty or locked, keeping", YELLOW))
+        return False
+    LOGGER.info(paint(f"{branch}: removed worktree {path}", BLUE))
+    return True
 
 
 def pull_requests(branch: str) -> list[dict[str, str]] | None:
@@ -229,8 +254,13 @@ def main() -> None:
             continue
 
         if branch in checked_out:
-            LOGGER.warning(paint(f"{branch}: {reason} but it is checked out, keeping", YELLOW))
-            continue
+            path = checked_out[branch]
+            if path is None:
+                message = f"{branch}: {reason} but the main worktree has it checked out, keeping"
+                LOGGER.warning(paint(message, YELLOW))
+                continue
+            if not remove_worktree(branch, path):
+                continue
 
         # `-D` drops the branch's reflog along with the ref, so log the hash as the local
         # handle on what was deleted. One record with a break in it, since the restore
